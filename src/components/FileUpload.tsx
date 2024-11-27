@@ -20,6 +20,7 @@ export function FileUpload(props: Props) {
 		console.log("Workbook sheets:", workbook.SheetNames);
 
 		const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+		// biome-ignore lint/suspicious/noExplicitAny: <explanation>
 		const data = utils.sheet_to_json<Record<string, any>>(worksheet);
 		console.log("Raw data first row:", data[0]);
 		console.log("Raw data column names:", Object.keys(data[0]));

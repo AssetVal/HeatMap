@@ -1,4 +1,3 @@
-// src/components/AddressMap.tsx
 import {
 	onMount,
 	createEffect,
@@ -7,11 +6,35 @@ import {
 	Show,
 	For,
 } from "solid-js";
+import "leaflet.markercluster/dist/MarkerCluster.css";
+import "leaflet.markercluster/dist/MarkerCluster.Default.css";
 import type { Address } from "../types";
 import { SlidePanel } from "./SlidePanel";
+import type {
+	Feature,
+	FeatureCollection,
+	MultiPolygon,
+	Polygon,
+	Position,
+} from "geojson";
 
 interface Props {
 	addresses: Address[];
+}
+
+interface CountyFeature extends Feature<Polygon | MultiPolygon> {
+	properties: {
+		density: number;
+		population: number;
+
+		// biome-ignore lint/suspicious/noExplicitAny: <explanation>
+		[key: string]: any;
+	};
+}
+
+async function loadCountyData(): Promise<FeatureCollection> {
+	const response = await fetch("/data/counties-with-population.geojson");
+	return response.json();
 }
 
 function formatETA(seconds: number): string {
@@ -23,6 +46,27 @@ function formatETA(seconds: number): string {
 	return `${minutes}m ${remainingSeconds}s`;
 }
 
+function calculateCentroid(
+	coordinates: Position[][] | Position[][][],
+): [number, number] {
+	let lat = 0;
+	let lng = 0;
+	let count = 0;
+
+	// Handle both Polygon and MultiPolygon coordinates
+	const coords = Array.isArray(coordinates[0][0])
+		? (coordinates[0] as Position[]) // Polygon
+		: (coordinates[0][0] as Position[]); // MultiPolygon
+
+	for (const coord of coords) {
+		lat += coord[1];
+		lng += coord[0];
+		count++;
+	}
+
+	return [lat / count, lng / count];
+}
+
 export function AddressMap(props: Props) {
 	const [isLoading, setIsLoading] = createSignal(false);
 	const [isClient, setIsClient] = createSignal(false);
@@ -32,12 +76,16 @@ export function AddressMap(props: Props) {
 	const [isPanelOpen, setIsPanelOpen] = createSignal(false);
 	const [failedAddresses, setFailedAddresses] = createSignal<Address[]>([]);
 	const [eta, setEta] = createSignal<string>("");
+	const [heatmapPoints, setHeatmapPoints] = createSignal<
+		[number, number, number][]
+	>([]);
 
 	let mapContainer: HTMLDivElement | undefined;
 	let map: L.Map | undefined;
 	// biome-ignore lint/suspicious/noExplicitAny: <Needed for structure>
 	let heatLayer: any;
-	let markersGroup: L.LayerGroup | undefined;
+	// biome-ignore lint/suspicious/noExplicitAny: <Needed for structure>
+	let markersGroup: any;
 	// biome-ignore lint/suspicious/noExplicitAny: <Needed for structure>
 	let L: any;
 
@@ -46,9 +94,27 @@ export function AddressMap(props: Props) {
 		if (typeof window === "undefined") return;
 
 		setIsClient(true);
+
+		try {
+			const countyData = await loadCountyData();
+			const points = (countyData.features as CountyFeature[]).map((feature) => {
+				const centroid = calculateCentroid(feature.geometry.coordinates);
+				const intensity = Math.log(feature.properties.density) / 25;
+				return [centroid[0], centroid[1], intensity] as [
+					number,
+					number,
+					number,
+				];
+			});
+			setHeatmapPoints(points);
+		} catch (error) {
+			console.error("Error loading county data:", error);
+		}
+
 		// Dynamically import Leaflet
 		const leaflet = await import("leaflet");
 		const leafletHeat = await import("leaflet.heat");
+		const markerCluster = await import("leaflet.markercluster");
 		L = leaflet.default;
 
 		// Wait for container to be ready
@@ -65,14 +131,35 @@ export function AddressMap(props: Props) {
 				attribution: "© OpenStreetMap contributors",
 			}).addTo(map);
 
-			heatLayer = L.heatLayer([], {
-				radius: 25,
-				blur: 15,
+			heatLayer = L.heatLayer(heatmapPoints(), {
+				radius: 35,
+				blur: 25,
 				maxZoom: 10,
 				max: 1.0,
+				gradient: {
+					0.2: "#fee5d9",
+					0.4: "#fcae91",
+					0.6: "#fb6a4a",
+					0.8: "#de2d26",
+					1.0: "#a50f15",
+				},
 			}).addTo(map);
 
-			markersGroup = L.layerGroup().addTo(map);
+			markersGroup = L.markerClusterGroup({
+				showCoverageOnHover: false,
+				maxClusterRadius: 50,
+				spiderfyOnMaxZoom: true,
+				disableClusteringAtZoom: 16,
+				// biome-ignore lint/suspicious/noExplicitAny: <explanation>
+				iconCreateFunction: (cluster: any) => {
+					const count = cluster.getChildCount();
+					return L.divIcon({
+						html: `<div class="cluster-marker">${count}</div>`,
+						className: "marker-cluster",
+						iconSize: L.point(40, 40),
+					});
+				},
+			}).addTo(map);
 
 			requestAnimationFrame(() => {
 				map?.invalidateSize(true);
@@ -103,14 +190,13 @@ export function AddressMap(props: Props) {
 			const coords = await geocode(addr.address);
 			if (coords) {
 				points.push([coords[0], coords[1], 1]);
-				L.marker(coords)
-					.bindPopup(`
+				const marker = L.marker(coords).bindPopup(`
             <div>
               <p><strong>${addr.fields.street}</strong></p>
               <p>${addr.fields.city}, ${addr.fields.state} ${addr.fields.zip}</p>
             </div>
-          `)
-					.addTo(markersGroup);
+          `);
+				markersGroup?.addLayer(marker);
 			} else {
 				setFailed((f) => f + 1);
 				setFailedAddresses((prev) => [...prev, addr]);

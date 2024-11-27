@@ -7,6 +7,7 @@ interface SlidePanelProps {
 }
 
 export function SlidePanel(props: SlidePanelProps) {
+	// src/components/SlidePanel.tsx
 	return (
 		<Show when={props.isOpen}>
 			<div
@@ -19,7 +20,7 @@ export function SlidePanel(props: SlidePanelProps) {
 					onClick={(e) => e.stopPropagation()}
 					onKeyDown={(e) => e.stopPropagation()}
 				>
-					<div class="p-4">
+					<div class="p-4 h-full flex flex-col">
 						<button
 							type="button"
 							onClick={props.onClose}
@@ -27,7 +28,10 @@ export function SlidePanel(props: SlidePanelProps) {
 						>
 							✕
 						</button>
-						{props.children}
+						<h2 class="text-xl font-semibold mb-4 pr-8">Failed Addresses</h2>
+						<div class="flex-1 overflow-y-auto custom-scrollbar">
+							{props.children}
+						</div>
 					</div>
 				</div>
 			</div>
