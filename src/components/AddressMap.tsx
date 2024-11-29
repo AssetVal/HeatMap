@@ -34,7 +34,20 @@ interface CountyFeature extends Feature<Polygon | MultiPolygon> {
 
 async function loadCountyData(): Promise<FeatureCollection> {
 	const response = await fetch("/data/counties-with-population.geojson");
-	return response.json();
+	const data = await response.json();
+
+	// Validate and normalize density values
+	data.features = data.features.map(
+		(feature: { properties: { density: number } }) => {
+			const density = Number(feature.properties.density);
+			feature.properties.density = Number.isNaN(density)
+				? 0
+				: Math.max(0, Math.min(density, 1000000));
+			return feature;
+		},
+	);
+
+	return data;
 }
 
 function formatETA(seconds: number): string {
@@ -46,25 +59,42 @@ function formatETA(seconds: number): string {
 	return `${minutes}m ${remainingSeconds}s`;
 }
 
-function calculateCentroid(
-	coordinates: Position[][] | Position[][][],
-): [number, number] {
-	let lat = 0;
-	let lng = 0;
-	let count = 0;
+// biome-ignore lint/suspicious/noExplicitAny: <explanation>
+function calculateCentroid(geometry: any): [number, number] {
+	try {
+		// Handle different geometry types
+		const coordinates =
+			geometry.type === "MultiPolygon"
+				? geometry.coordinates[0][0] // First polygon of multipolygon
+				: geometry.coordinates[0]; // First ring of polygon
 
-	// Handle both Polygon and MultiPolygon coordinates
-	const coords = Array.isArray(coordinates[0][0])
-		? (coordinates[0] as Position[]) // Polygon
-		: (coordinates[0][0] as Position[]); // MultiPolygon
+		let sumLat = 0;
+		let sumLng = 0;
+		let count = 0;
 
-	for (const coord of coords) {
-		lat += coord[1];
-		lng += coord[0];
-		count++;
+		// Process each coordinate pair
+		for (const coord of coordinates) {
+			// GeoJSON coordinates are [longitude, latitude]
+			const lng = Number(coord[0]);
+			const lat = Number(coord[1]);
+
+			if (!Number.isNaN(lat) && !Number.isNaN(lng)) {
+				sumLat += lat;
+				sumLng += lng;
+				count++;
+			}
+		}
+
+		if (count === 0) {
+			console.warn("No valid coordinates found");
+			return [0, 0];
+		}
+
+		return [sumLat / count, sumLng / count];
+	} catch (error) {
+		console.error("Error calculating centroid:", error);
+		return [0, 0];
 	}
-
-	return [lat / count, lng / count];
 }
 
 export function AddressMap(props: Props) {
@@ -92,20 +122,36 @@ export function AddressMap(props: Props) {
 	// Initialize map after component mounts
 	onMount(async () => {
 		if (typeof window === "undefined") return;
-
 		setIsClient(true);
 
 		try {
 			const countyData = await loadCountyData();
-			const points = (countyData.features as CountyFeature[]).map((feature) => {
-				const centroid = calculateCentroid(feature.geometry.coordinates);
-				const intensity = Math.log(feature.properties.density) / 25;
-				return [centroid[0], centroid[1], intensity] as [
-					number,
-					number,
-					number,
-				];
-			});
+
+			// Find max density for normalization
+			const densities = countyData.features.map(
+				(f) => f.properties?.density || 0,
+			);
+			const maxDensity = Math.max(...densities);
+			const minDensity = Math.min(...densities.filter((d) => d > 0));
+
+			const points = countyData.features
+				.map((feature) => {
+					const centroid = calculateCentroid(feature.geometry);
+					if (centroid[0] === 0 && centroid[1] === 0) return null;
+
+					// Normalize density to 0-1 range using log scale
+					const density = feature.properties?.density || 0;
+					const intensity =
+						density > 0 ? Math.log(density + 1) / Math.log(maxDensity + 1) : 0;
+
+					return [centroid[0], centroid[1], intensity] as [
+						number,
+						number,
+						number,
+					];
+				})
+				.filter((point): point is [number, number, number] => point !== null);
+
 			setHeatmapPoints(points);
 		} catch (error) {
 			console.error("Error loading county data:", error);
@@ -133,15 +179,18 @@ export function AddressMap(props: Props) {
 
 			heatLayer = L.heatLayer(heatmapPoints(), {
 				radius: 35,
-				blur: 25,
+				blur: 20,
 				maxZoom: 10,
 				max: 1.0,
+
+				minOpacity: 0.35,
 				gradient: {
-					0.2: "#fee5d9",
-					0.4: "#fcae91",
-					0.6: "#fb6a4a",
-					0.8: "#de2d26",
-					1.0: "#a50f15",
+					0: "#053061", // Dark blue
+					0.2: "#2166ac", // Medium blue
+					0.4: "#f7f7f7", // White/yellow transition
+					0.6: "#fec44f", // Yellow
+					0.8: "#ec7014", // Orange
+					1.0: "#a50f15", // Dark red
 				},
 			}).addTo(map);
 
@@ -160,6 +209,17 @@ export function AddressMap(props: Props) {
 					});
 				},
 			}).addTo(map);
+
+			map?.on("zoomend", () => {
+				const zoom = map?.getZoom();
+				if (!zoom) return;
+				const radius = Math.max(5, 25 - zoom); // Adjust radius based on zoom
+				const blur = Math.max(4, 20 - zoom); // Adjust blur based on zoom
+				heatLayer.setOptions({
+					radius: radius,
+					blur: blur,
+				});
+			});
 
 			requestAnimationFrame(() => {
 				map?.invalidateSize(true);
