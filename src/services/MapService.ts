@@ -5,6 +5,7 @@ import type { GeoJSON, MarkerCluster, MarkerClusterGroup } from 'leaflet';
 import type { CountyFeature } from '~/types/map';
 import type { Address } from '../types';
 import { AddressValidationService } from './GeocodingService';
+import consola from 'consola';
 
 export class MapService {
   private map: L.Map | undefined;
@@ -162,7 +163,7 @@ export class MapService {
     onProgress?: (current: number) => void,
   ): Promise<{ failed: Address[] }> {
     console.log('Starting to add markers for addresses:', addresses);
-    const failed: Address[] = [];
+    const failed: Array<Address & { error: string }> = [];
     if (!this.markersGroup) {
       console.warn('No markers group available');
       return { failed };
@@ -171,7 +172,7 @@ export class MapService {
     this.markersGroup.clearLayers();
 
     for (const [index, addr] of addresses.entries()) {
-      console.log(`Processing address ${index + 1}:`, addr);
+      consola.start(`Processing address ${index + 1}:`, addr);
       onProgress?.(index + 1);
 
       const geocodeAddress = {
@@ -181,19 +182,19 @@ export class MapService {
         zip: addr.fields.zip || '',
       };
 
-      const coords = await this.geocode(geocodeAddress);
-      if (coords) {
-        console.log('Successfully geocoded address:', coords);
-        const marker = this.L!.marker(coords).bindPopup(`
+      const result = await this.geocode(geocodeAddress);
+      if (result.coords) {
+        console.log('Successfully geocoded address:', result.coords);
+        const marker = this.L!.marker(result.coords).bindPopup(`
         <div>
           <p><strong>${addr.fields.street}</strong></p>
           <p>${addr.fields.city}, ${addr.fields.state} ${addr.fields.zip}</p>
         </div>
       `);
-        this.markersGroup.addLayer(marker);
+        this.markersGroup!.addLayer(marker);
       } else {
-        console.warn('Failed to geocode address:', addr);
-        failed.push(addr);
+        consola.fail('Failed to geocode address:', addr, result.error);
+        failed.push({ ...addr, error: result.error || 'Unknown error' });
       }
     }
 
@@ -210,25 +211,34 @@ export class MapService {
     city: string;
     state: USStateAbbreviations;
     zip: string;
-  }): Promise<[number, number] | null> {
+  }): Promise<{ coords: [number, number] | null; error?: string }> {
     try {
       const geocodingService = new AddressValidationService(address);
       const validatedAddress = await geocodingService.exec();
       if (!validatedAddress) {
-        console.warn('Address validation failed:', address);
-        return null;
+        consola.warn('Address validation failed:', address);
+        return { coords: null, error: 'Address validation failed' };
       }
 
       const { location } = validatedAddress.geocode;
       if (!location?.latitude || !location?.longitude) {
-        console.warn('Invalid coordinates:', location);
-        return null;
+        consola.warn('Invalid coordinates:', location);
+        return {
+          coords: null,
+          error: 'No coordinates returned from geocoding service',
+        };
       }
 
-      return [Number(location.latitude), Number(location.longitude)];
+      return {
+        coords: [Number(location.latitude), Number(location.longitude)],
+      };
     } catch (error) {
-      console.error('Geocoding error:', error, address);
-      return null;
+      consola.error('Geocoding error:', error, address);
+      return {
+        coords: null,
+        error:
+          error instanceof Error ? error.message : 'Unknown geocoding error',
+      };
     }
   }
 

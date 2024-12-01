@@ -2,7 +2,7 @@ import { type USState, USStateConverter } from '@assetval/state-switcher';
 import {
   Configuration,
   UsVerificationsApi,
-  UsVerificationsWritable,
+  UsVerificationsWritable, // @ts-ignore
 } from '@lob/lob-typescript-sdk';
 import ZipMonster from '@simplisticated/zip-monster';
 import { type ZipInformation } from '@simplisticated/zip-monster/dist/data/models/zip-information';

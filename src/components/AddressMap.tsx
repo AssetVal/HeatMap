@@ -150,6 +150,9 @@ export function AddressMap(props: Props) {
                 <p class="text-sm text-gray-600">
                   {addr.fields.city}, {addr.fields.state} {addr.fields.zip}
                 </p>
+                <p class="text-xs text-red-600 mt-1">
+                  Error: {(addr as any).error || 'Failed to geocode'}
+                </p>
               </div>
             )}
           </For>
