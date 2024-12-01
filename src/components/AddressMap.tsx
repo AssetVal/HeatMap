@@ -46,7 +46,6 @@ export function AddressMap(props: Props) {
   // Initialize map after component mounts
   onMount(async () => {
     if (typeof window === 'undefined') return;
-    console.log('API Key:', import.meta.env.VITE_GOOGLE_API_KEY);
 
     try {
       await new Promise((resolve) => setTimeout(resolve, 0)); // Wait for DOM
