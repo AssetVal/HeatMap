@@ -1,6 +1,7 @@
 import 'leaflet.markercluster/dist/MarkerCluster.css';
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
 import {
+  batch,
   createEffect,
   createSignal,
   For,
@@ -9,7 +10,7 @@ import {
   Show,
 } from 'solid-js';
 import { MapService } from '~/services/MapService';
-import type { Address } from '../types';
+import type { Address } from '~/types';
 import { SlidePanel } from './SlidePanel';
 
 interface Props {
@@ -17,11 +18,15 @@ interface Props {
 }
 
 function formatETA(seconds: number): string {
-  if (seconds < 60) {
-    return `${Math.ceil(seconds)}s`;
+  // Convert from number of addresses to actual seconds
+  // Using 200ms per address instead of 1 second
+  const totalSeconds = seconds * 0.2;
+
+  if (totalSeconds < 60) {
+    return `${Math.ceil(totalSeconds)}s`;
   }
-  const minutes = Math.floor(seconds / 60);
-  const remainingSeconds = Math.ceil(seconds % 60);
+  const minutes = Math.floor(totalSeconds / 60);
+  const remainingSeconds = Math.ceil(totalSeconds % 60);
   return `${minutes}m ${remainingSeconds}s`;
 }
 
@@ -41,6 +46,7 @@ export function AddressMap(props: Props) {
   // Initialize map after component mounts
   onMount(async () => {
     if (typeof window === 'undefined') return;
+    console.log('API Key:', import.meta.env.VITE_GOOGLE_API_KEY);
 
     try {
       await new Promise((resolve) => setTimeout(resolve, 0)); // Wait for DOM
@@ -59,21 +65,38 @@ export function AddressMap(props: Props) {
   });
 
   createEffect(async () => {
+    console.log('AddressMap effect triggered with addresses:', props.addresses);
     if (!mapService || !props.addresses.length) return;
 
-    setIsLoading(true);
-    setProgress(0);
-    setFailed(0);
-    setTotal(props.addresses.length);
-    setFailedAddresses([]);
-    setEta(formatETA(props.addresses.length));
+    batch(() => {
+      setIsLoading(true);
+      setProgress(0);
+      setFailed(0);
+      setTotal(props.addresses.length);
+      setFailedAddresses([]);
+      setEta(formatETA(props.addresses.length));
+    });
 
-    const { failed: failedAddrs } = await mapService.addMarkers(
-      props.addresses,
-    );
-    setFailedAddresses(failedAddrs);
-    setFailed(failedAddrs.length);
-    setIsLoading(false);
+    try {
+      const { failed: failedAddrs } = await mapService.addMarkers(
+        props.addresses,
+        (current) => {
+          console.log(
+            `Processing address ${current}/${props.addresses.length}`,
+          );
+          setProgress(current);
+        },
+      );
+
+      batch(() => {
+        setFailedAddresses(failedAddrs);
+        setFailed(failedAddrs.length);
+        setIsLoading(false);
+      });
+    } catch (error) {
+      console.error('Error during geocoding:', error);
+      setIsLoading(false);
+    }
   });
 
   onCleanup(() => {

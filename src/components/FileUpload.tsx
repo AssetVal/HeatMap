@@ -1,5 +1,6 @@
 import { read, utils } from 'xlsx';
 import type { Address, AddressFields } from '../types';
+import consola from 'consola';
 
 interface Props {
   onAddresses: (addresses: Address[]) => void;
@@ -28,7 +29,7 @@ export function FileUpload(props: Props) {
     const addresses = data
       .map((row) => {
         // Log each row to see the structure
-        console.log('Processing row:', row);
+        consola.start('Processing row:', row);
 
         // Try to find address-related fields
         const addressFields = {
@@ -39,11 +40,11 @@ export function FileUpload(props: Props) {
         };
 
         // Log found fields
-        console.log('Found address fields:', addressFields);
+        consola.info('Found address fields:', addressFields);
 
         // Only include rows that have some address data
         if (!Object.values(addressFields).some(Boolean)) {
-          console.log('Skipping row - no address data found');
+          consola.info('Skipping row - no address data found');
           return null;
         }
 
@@ -68,7 +69,7 @@ export function FileUpload(props: Props) {
       })
       .filter(Boolean) as Address[];
 
-    console.log('Processed addresses:', addresses);
+    consola.success('Processed addresses:', addresses);
     props.onAddresses(addresses);
   };
 

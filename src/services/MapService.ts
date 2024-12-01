@@ -1,8 +1,10 @@
-import type L from 'leaflet';
+import { type USStateAbbreviations } from '@assetval/state-switcher';
 import type { FeatureCollection } from 'geojson';
+import type L from 'leaflet';
+import type { GeoJSON, MarkerCluster, MarkerClusterGroup } from 'leaflet';
 import type { CountyFeature } from '~/types/map';
 import type { Address } from '../types';
-import type { MarkerClusterGroup, GeoJSON, MarkerCluster } from 'leaflet';
+import { AddressValidationService } from './GeocodingService';
 
 export class MapService {
   private map: L.Map | undefined;
@@ -155,42 +157,77 @@ export class MapService {
     legend.addTo(this.map);
   }
 
-  async addMarkers(addresses: Address[]): Promise<{ failed: Address[] }> {
+  async addMarkers(
+    addresses: Address[],
+    onProgress?: (current: number) => void,
+  ): Promise<{ failed: Address[] }> {
+    console.log('Starting to add markers for addresses:', addresses);
     const failed: Address[] = [];
-    if (!this.markersGroup) return { failed };
+    if (!this.markersGroup) {
+      console.warn('No markers group available');
+      return { failed };
+    }
+
     this.markersGroup.clearLayers();
 
-    for (const addr of addresses) {
-      const coords = await this.geocode(addr.address);
+    for (const [index, addr] of addresses.entries()) {
+      console.log(`Processing address ${index + 1}:`, addr);
+      onProgress?.(index + 1);
+
+      const geocodeAddress = {
+        street: addr.fields.street || '',
+        city: addr.fields.city || '',
+        state: addr.fields.state as USStateAbbreviations,
+        zip: addr.fields.zip || '',
+      };
+
+      const coords = await this.geocode(geocodeAddress);
       if (coords) {
+        console.log('Successfully geocoded address:', coords);
         const marker = this.L!.marker(coords).bindPopup(`
-          <div>
-            <p><strong>${addr.fields.street}</strong></p>
-            <p>${addr.fields.city}, ${addr.fields.state} ${addr.fields.zip}</p>
-          </div>
-        `);
+        <div>
+          <p><strong>${addr.fields.street}</strong></p>
+          <p>${addr.fields.city}, ${addr.fields.state} ${addr.fields.zip}</p>
+        </div>
+      `);
         this.markersGroup.addLayer(marker);
       } else {
+        console.warn('Failed to geocode address:', addr);
         failed.push(addr);
       }
     }
 
     if (this.markersGroup.getLayers().length) {
+      console.log('Fitting bounds to markers');
       this.map?.fitBounds(this.markersGroup.getBounds().pad(0.1));
     }
 
     return { failed };
   }
 
-  private async geocode(address: string): Promise<[number, number] | null> {
+  private async geocode(address: {
+    street: string;
+    city: string;
+    state: USStateAbbreviations;
+    zip: string;
+  }): Promise<[number, number] | null> {
     try {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`,
-      );
-      const data = await response.json();
-      return data?.[0] ? [Number(data[0].lat), Number(data[0].lon)] : null;
+      const geocodingService = new AddressValidationService(address);
+      const validatedAddress = await geocodingService.exec();
+      if (!validatedAddress) {
+        console.warn('Address validation failed:', address);
+        return null;
+      }
+
+      const { location } = validatedAddress.geocode;
+      if (!location?.latitude || !location?.longitude) {
+        console.warn('Invalid coordinates:', location);
+        return null;
+      }
+
+      return [Number(location.latitude), Number(location.longitude)];
     } catch (error) {
-      console.error('Geocoding error:', error);
+      console.error('Geocoding error:', error, address);
       return null;
     }
   }
