@@ -46,12 +46,15 @@ def process_county_data():
         fips = state_fips + county_fips
         
         population = pop_by_fips.get(fips, 0)
-        area = shape(feature['geometry']).area * 0.000001
-        density = population / area if area > 0 else 0
+        # Fix: Convert square degrees to square kilometers
+        # 1 degree is approximately 111 km at the equator
+        area_sq_deg = shape(feature['geometry']).area
+        area_km2 = area_sq_deg * (111 * 111)  # approximate conversion
+        density = population / area_km2 if area_km2 > 0 else 0
         
         feature['properties'].update({
             'population': population,
-            'area_km2': area,
+            'area_km2': area_km2,
             'density': density
         })
 
