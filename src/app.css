@@ -86,3 +86,7 @@ html, body {
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background-color: rgba(156, 163, 175, 0.8);
 }
+
+.info.legend {
+  color: black
+}

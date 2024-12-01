@@ -32,22 +32,33 @@ interface CountyFeature extends Feature<Polygon | MultiPolygon> {
 	};
 }
 
-async function loadCountyData(): Promise<FeatureCollection> {
+async function loadCountyData(): Promise<{
+	geojson: FeatureCollection;
+	points: [];
+}> {
 	const response = await fetch("/data/counties-with-population.geojson");
 	const data = await response.json();
 
-	// Validate and normalize density values
-	data.features = data.features.map(
-		(feature: { properties: { density: number } }) => {
-			const density = Number(feature.properties.density);
-			feature.properties.density = Number.isNaN(density)
-				? 0
-				: Math.max(0, Math.min(density, 1000000));
-			return feature;
-		},
-	);
+	// Find min/max density for better normalization
+	const densities = data.features
+		.map((f: CountyFeature) => f.properties.density)
+		.filter((d: number) => d > 0);
 
-	return data;
+	const maxDensity = Math.max(...densities);
+	const minDensity = Math.min(...densities);
+
+	// Process the county features for choropleth display
+	const features = data.features.map((feature: CountyFeature) => {
+		const density = Number(feature.properties.density);
+		// Keep the raw density but ensure it's a valid number
+		feature.properties.density = Number.isNaN(density) ? 0 : density;
+		return feature;
+	});
+
+	return {
+		geojson: { ...data, features },
+		points: [],
+	};
 }
 
 function formatETA(seconds: number): string {
@@ -59,42 +70,26 @@ function formatETA(seconds: number): string {
 	return `${minutes}m ${remainingSeconds}s`;
 }
 
-// biome-ignore lint/suspicious/noExplicitAny: <explanation>
-function calculateCentroid(geometry: any): [number, number] {
-	try {
-		// Handle different geometry types
-		const coordinates =
-			geometry.type === "MultiPolygon"
-				? geometry.coordinates[0][0] // First polygon of multipolygon
-				: geometry.coordinates[0]; // First ring of polygon
-
-		let sumLat = 0;
-		let sumLng = 0;
-		let count = 0;
-
-		// Process each coordinate pair
-		for (const coord of coordinates) {
-			// GeoJSON coordinates are [longitude, latitude]
-			const lng = Number(coord[0]);
-			const lat = Number(coord[1]);
-
-			if (!Number.isNaN(lat) && !Number.isNaN(lng)) {
-				sumLat += lat;
-				sumLng += lng;
-				count++;
-			}
-		}
-
-		if (count === 0) {
-			console.warn("No valid coordinates found");
-			return [0, 0];
-		}
-
-		return [sumLat / count, sumLng / count];
-	} catch (error) {
-		console.error("Error calculating centroid:", error);
-		return [0, 0];
-	}
+function getColor(density: number): string {
+	return density > 500
+		? "#800026"
+		: // Dark red
+			density > 200
+			? "#BD0026"
+			: // Red
+				density > 100
+				? "#E31A1C"
+				: // Bright red
+					density > 50
+					? "#FC4E2A"
+					: // Orange-red
+						density > 20
+						? "#FD8D3C"
+						: // Orange
+							density > 10
+							? "#FEB24C"
+							: // Light orange
+								"#FED976"; // Light yellow
 }
 
 export function AddressMap(props: Props) {
@@ -116,6 +111,7 @@ export function AddressMap(props: Props) {
 	let heatLayer: any;
 	// biome-ignore lint/suspicious/noExplicitAny: <Needed for structure>
 	let markersGroup: any;
+	let countyLayer: L.GeoJSON | undefined;
 	// biome-ignore lint/suspicious/noExplicitAny: <Needed for structure>
 	let L: any;
 
@@ -125,106 +121,101 @@ export function AddressMap(props: Props) {
 		setIsClient(true);
 
 		try {
-			const countyData = await loadCountyData();
+			const { geojson } = await loadCountyData();
 
-			// Find max density for normalization
-			const densities = countyData.features.map(
-				(f) => f.properties?.density || 0,
-			);
-			const maxDensity = Math.max(...densities);
-			const minDensity = Math.min(...densities.filter((d) => d > 0));
+			const leaflet = await import("leaflet");
+			const markerCluster = await import("leaflet.markercluster");
+			L = leaflet.default;
 
-			const points = countyData.features
-				.map((feature) => {
-					const centroid = calculateCentroid(feature.geometry);
-					if (centroid[0] === 0 && centroid[1] === 0) return null;
+			// Wait for container to be ready
+			requestAnimationFrame(() => {
+				if (!mapContainer) return;
 
-					// Normalize density to 0-1 range using log scale
-					const density = feature.properties?.density || 0;
-					const intensity =
-						density > 0 ? Math.log(density + 1) / Math.log(maxDensity + 1) : 0;
+				map = L.map(mapContainer, {
+					center: [40, -95],
+					zoom: 4,
+					minZoom: 2,
+				});
 
-					return [centroid[0], centroid[1], intensity] as [
-						number,
-						number,
-						number,
+				L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+					attribution: "© OpenStreetMap contributors",
+				}).addTo(map);
+
+				// Add county choropleth layer
+				countyLayer = L.geoJSON(geojson, {
+					style: (feature) => {
+						const density = feature?.properties?.density || 0;
+						return {
+							fillColor: getColor(density),
+							weight: 1,
+							opacity: 1,
+							color: "white",
+							fillOpacity: 0.7,
+						};
+					},
+					onEachFeature: (feature, layer) => {
+						layer.bindPopup(`
+              <div>
+                <strong>${feature.properties.NAME}</strong><br/>
+                Population: ${feature.properties.population.toLocaleString()}<br/>
+                Density: ${feature.properties.density.toFixed(2)} people/km²
+              </div>
+            `);
+					},
+				}).addTo(map);
+
+				// Legend for county density
+				const legend = L.control({ position: "bottomright" });
+				legend.onAdd = () => {
+					const div = L.DomUtil.create("div", "info legend");
+					const grades = [0, 10, 20, 50, 100, 200, 500];
+
+					div.style.backgroundColor = "white";
+					div.style.padding = "6px 8px";
+					div.style.border = "1px solid #ccc";
+					div.style.borderRadius = "4px";
+
+					let labels = [
+						"<strong>Population Density</strong><br>(people/km²)<br>",
 					];
-				})
-				.filter((point): point is [number, number, number] => point !== null);
 
-			setHeatmapPoints(points);
+					for (let i = 0; i < grades.length; i++) {
+						const from = grades[i];
+						const to = grades[i + 1];
+
+						labels.push(
+							'<i style="background:' +
+								getColor(from + 1) +
+								'; width: 18px; height: 18px; float: left; margin-right: 8px; opacity: 0.7"></i> ' +
+								from +
+								(to ? "&ndash;" + to : "+"),
+						);
+					}
+
+					div.innerHTML = labels.join("<br>");
+					return div;
+				};
+				legend.addTo(map);
+
+				// Initialize marker cluster group for addresses
+				markersGroup = L.markerClusterGroup({
+					showCoverageOnHover: false,
+					maxClusterRadius: 50,
+					spiderfyOnMaxZoom: true,
+					disableClusteringAtZoom: 16,
+					iconCreateFunction: (cluster) => {
+						const count = cluster.getChildCount();
+						return L.divIcon({
+							html: `<div class="cluster-marker">${count}</div>`,
+							className: "marker-cluster",
+							iconSize: L.point(40, 40),
+						});
+					},
+				}).addTo(map);
+			});
 		} catch (error) {
 			console.error("Error loading county data:", error);
 		}
-
-		// Dynamically import Leaflet
-		const leaflet = await import("leaflet");
-		const leafletHeat = await import("leaflet.heat");
-		const markerCluster = await import("leaflet.markercluster");
-		L = leaflet.default;
-
-		// Wait for container to be ready
-		requestAnimationFrame(() => {
-			if (!mapContainer) return;
-
-			map = L.map(mapContainer, {
-				center: [40, -95],
-				zoom: 4,
-				minZoom: 2,
-			});
-
-			L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-				attribution: "© OpenStreetMap contributors",
-			}).addTo(map);
-
-			heatLayer = L.heatLayer(heatmapPoints(), {
-				radius: 35,
-				blur: 20,
-				maxZoom: 10,
-				max: 1.0,
-
-				minOpacity: 0.35,
-				gradient: {
-					0: "#053061", // Dark blue
-					0.2: "#2166ac", // Medium blue
-					0.4: "#f7f7f7", // White/yellow transition
-					0.6: "#fec44f", // Yellow
-					0.8: "#ec7014", // Orange
-					1.0: "#a50f15", // Dark red
-				},
-			}).addTo(map);
-
-			markersGroup = L.markerClusterGroup({
-				showCoverageOnHover: false,
-				maxClusterRadius: 50,
-				spiderfyOnMaxZoom: true,
-				disableClusteringAtZoom: 16,
-				// biome-ignore lint/suspicious/noExplicitAny: <explanation>
-				iconCreateFunction: (cluster: any) => {
-					const count = cluster.getChildCount();
-					return L.divIcon({
-						html: `<div class="cluster-marker">${count}</div>`,
-						className: "marker-cluster",
-						iconSize: L.point(40, 40),
-					});
-				},
-			}).addTo(map);
-
-			map?.on("zoomend", () => {
-				const zoom = map?.getZoom();
-				if (!zoom) return;
-				const radius = Math.max(5, 25 - zoom); // Adjust radius based on zoom
-				const blur = Math.max(4, 20 - zoom); // Adjust blur based on zoom
-				heatLayer.setOptions({
-					radius: radius,
-					blur: blur,
-				});
-			});
-
-			requestAnimationFrame(() => {
-				map?.invalidateSize(true);
-			});
-		});
 	});
 
 	createEffect(async () => {
