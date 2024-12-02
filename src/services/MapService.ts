@@ -3,9 +3,11 @@ import type { FeatureCollection } from 'geojson';
 import type L from 'leaflet';
 import type { GeoJSON, MarkerCluster, MarkerClusterGroup } from 'leaflet';
 import type { CountyFeature } from '~/types/map';
-import type { Address } from '../types';
+import type { Address, AddressFields } from '../types';
 import { AddressValidationService } from './GeocodingService';
 import consola from 'consola';
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 export class MapService {
   private map: L.Map | undefined;
@@ -240,6 +242,36 @@ export class MapService {
           error instanceof Error ? error.message : 'Unknown geocoding error',
       };
     }
+  }
+
+  static async saveHeatMap(addresses: Array<AddressFields>): Promise<string> {
+    const response = await fetch(`${API_URL}/saveHeatmapData`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ addresses }),
+    });
+
+    const data = await response.json();
+    if (!data.success) {
+      throw new Error(data.message || 'Failed to save heatmap');
+    }
+
+    return data.data._id;
+  }
+
+  static async loadHeatMap(heatmapID: string): Promise<Address[]> {
+    const response = await fetch(`${API_URL}/loadHeatmapData`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ heatmapID }),
+    });
+
+    const data = await response.json();
+    if (!data.success) {
+      throw new Error(data.message || 'Failed to load heatmap');
+    }
+
+    return data.data.addresses;
   }
 
   cleanup(): void {
