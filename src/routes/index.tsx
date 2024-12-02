@@ -7,7 +7,7 @@ export default function Home() {
 	const [addresses, setAddresses] = createSignal<Address[]>([]);
 
 	return (
-		<main class="flex flex-col h-[calc(100vh-4rem)]">
+		<main class="flex flex-col h-[calc(100dvh)]">
 			<FileUpload onAddresses={setAddresses} />
 			<div class="flex-1">
 				<AddressMap addresses={addresses()} />

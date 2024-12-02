@@ -13,7 +13,7 @@ export default function Nav() {
 					<a href="/">Home</a>
 				</li>
 
-				<li class="text-2xl font-thin text-center">Address HeatMap</li>
+				<li class="text-2xl font-thin text-center">Veritas Data</li>
 
 				<div class="w-[43.6px]">&nbsp;</div>
 			</ul>
