@@ -53,6 +53,11 @@ export class AddressValidationService {
     try {
       const { street, unitNumber, city, state, zip } = this.address;
 
+      // Validate inputs before making API call
+      if (!street || !city || !state || !zip) {
+        throw new Error('Missing required address fields');
+      }
+
       const response = await fetch(
         `https://addressvalidation.googleapis.com/v1:validateAddress?key=${encodeURIComponent(import.meta.env.VITE_GOOGLE_API_KEY!)}`,
         {
@@ -63,20 +68,27 @@ export class AddressValidationService {
               addressLines: [`${street} ${unitNumber ?? ''}`.trim()],
               locality: city,
               administrativeArea: state,
-              postalCode: zip,
+              postalCode: zip.toString(),
             },
           }),
         },
       );
+
+      if (!response.ok) {
+        throw new Error(`Google API error: ${response.status}`);
+      }
+
       const results = (await response.json()) as {
         result?: GoogleAddressValidationResult;
         error?: { message: string };
       };
+
       if (!results) {
         throw new Error(
           'We encountered an error when trying to run our address validation service, please contact AssetVal I.T.',
         );
       }
+
       if (results.error) throw new Error(results.error.message);
       if (!results.result) {
         throw new Error(
