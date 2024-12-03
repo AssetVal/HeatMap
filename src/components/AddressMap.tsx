@@ -15,6 +15,7 @@ import { useMapStore } from '~/stores/mapStore';
 
 interface Props {
   addresses: Address[];
+  isSharedMap?: boolean;
 }
 
 const copyToClipboard = async (text: string) => {
@@ -143,7 +144,7 @@ export function AddressMap(props: Props) {
         </div>
       </Show>
 
-      <Show when={!state.isLoading && state.isSuccess}>
+      <Show when={!state.isLoading && state.isSuccess && !props.isSharedMap}>
         <div class="absolute top-4 right-4 bg-white px-4 py-2 rounded shadow z-[1000]">
           <button
             onClick={handleShare}

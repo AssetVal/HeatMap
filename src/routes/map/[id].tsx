@@ -116,7 +116,7 @@ export default function SharedMap() {
               }
             >
               <div class="flex-1">
-                <AddressMap addresses={addresses() || []} />
+                <AddressMap addresses={addresses() || []} isSharedMap={true} />
               </div>
             </Show>
           </Show>
