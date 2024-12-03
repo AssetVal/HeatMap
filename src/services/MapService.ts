@@ -2,10 +2,11 @@ import { type USStateAbbreviations } from '@assetval/state-switcher';
 import type { FeatureCollection } from 'geojson';
 import type L from 'leaflet';
 import type { GeoJSON, MarkerCluster, MarkerClusterGroup } from 'leaflet';
-import type { CountyFeature } from '~/types/map';
+import type { CountyFeature, HeatmapData } from '~/types/map';
 import type { Address, AddressFields } from '../types';
 import { AddressValidationService } from './GeocodingService';
 import consola from 'consola';
+import { useMapStore } from '~/stores/mapStore';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
@@ -14,44 +15,59 @@ export class MapService {
   private L: typeof L | undefined; // Will hold Leaflet instance
   private markersGroup: MarkerClusterGroup | undefined;
   private countyLayer: GeoJSON | undefined;
+  private mapStore: ReturnType<typeof useMapStore>;
 
-  constructor(private container: HTMLElement) {}
+  constructor(private container: HTMLElement) {
+    this.mapStore = useMapStore();
+    console.log('MapService initialized with container:', container);
+  }
 
   async initialize(): Promise<void> {
+    console.log('Initializing map service...');
+
     if (!this.container) {
       console.error('Invalid container element');
       return;
     }
 
-    console.debug('Loading Leaflet...');
+    try {
+      const leaflet = await import('leaflet');
+      await import('leaflet.markercluster');
+      this.L = leaflet.default;
 
-    const leaflet = await import('leaflet');
-    const _markerCluster = await import('leaflet.markercluster');
-    this.L = leaflet.default;
+      if (!this.L) {
+        console.error('Failed to load Leaflet');
+        return;
+      } else {
+        console.debug('Leaflet loaded');
+      }
 
-    if (!this.L) {
-      console.error('Failed to load Leaflet');
-      return;
-    } else {
-      console.debug('Leaflet loaded');
+      consola.info('Creating map instance...');
+      this.map = this.L.map(this.container, {
+        center: [40, -95],
+        zoom: 4,
+        minZoom: 2,
+      });
+
+      this.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors',
+      }).addTo(this.map);
+
+      consola.start('Initializing marker cluster...');
+      this.initializeMarkerCluster();
+      consola.success('Marker cluster initialized');
+
+      // Force a resize to ensure proper rendering
+      setTimeout(() => {
+        console.log('Invalidating map size...');
+        this.map?.invalidateSize();
+      }, 250);
+
+      console.log('Map initialization complete');
+    } catch (error) {
+      console.error('Error during map initialization:', error);
+      throw error;
     }
-
-    this.map = this.L.map(this.container, {
-      center: [40, -95],
-      zoom: 4,
-      minZoom: 2,
-    });
-
-    this.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap contributors',
-    }).addTo(this.map);
-
-    this.initializeMarkerCluster();
-
-    // Force a resize to ensure proper rendering
-    setTimeout(() => {
-      this.map?.invalidateSize();
-    }, 100);
   }
 
   private initializeMarkerCluster(): void {
@@ -164,19 +180,53 @@ export class MapService {
     addresses: Address[],
     onProgress?: (current: number) => void,
   ): Promise<{ failed: Address[] }> {
-    console.log('Starting to add markers for addresses:', addresses);
+    console.log(`Adding ${addresses.length} markers to map`);
     const failed: Array<Address & { error: string }> = [];
+
     if (!this.markersGroup) {
-      console.warn('No markers group available');
-      return { failed };
+      console.error('No markers group available - reinitializing');
+      this.initializeMarkerCluster();
+      if (!this.markersGroup) {
+        return { failed };
+      }
     }
 
     this.markersGroup.clearLayers();
+    let successCount = 0;
 
     for (const [index, addr] of addresses.entries()) {
-      consola.start(`Processing address ${index + 1}:`, addr);
       onProgress?.(index + 1);
 
+      // Check if address already has coordinates
+      if (addr.lat && addr.lng) {
+        console.log(`Using existing coordinates for ${addr.fields.street}:`, {
+          lat: addr.lat,
+          lng: addr.lng,
+        });
+
+        try {
+          const marker = this.L!.marker([addr.lat, addr.lng]).bindPopup(`
+          <div>
+            <p><strong>${addr.fields.street}</strong></p>
+            <p>${addr.fields.city}, ${addr.fields.state} ${addr.fields.zip}</p>
+          </div>
+        `);
+
+          this.markersGroup.addLayer(marker);
+          this.mapStore.actions.setGeocoded(addr, {
+            lat: addr.lat,
+            lng: addr.lng,
+          });
+          successCount++;
+          continue;
+        } catch (error) {
+          console.error('Error adding marker:', error);
+          failed.push({ ...addr, error: 'Failed to add marker' });
+          continue;
+        }
+      }
+
+      // Only geocode if coordinates don't exist
       const geocodeAddress = {
         street: addr.fields.street || '',
         city: addr.fields.city || '',
@@ -187,6 +237,11 @@ export class MapService {
       const result = await this.geocode(geocodeAddress);
       if (result.coords) {
         console.log('Successfully geocoded address:', result.coords);
+        this.mapStore.actions.setGeocoded(addr, {
+          lat: result.coords[0],
+          lng: result.coords[1],
+        });
+
         const marker = this.L!.marker(result.coords).bindPopup(`
         <div>
           <p><strong>${addr.fields.street}</strong></p>
@@ -200,9 +255,13 @@ export class MapService {
       }
     }
 
+    console.log(`Successfully added ${successCount} markers`);
+
     if (this.markersGroup.getLayers().length) {
       console.log('Fitting bounds to markers');
       this.map?.fitBounds(this.markersGroup.getBounds().pad(0.1));
+    } else {
+      console.warn('No layers in marker group to fit bounds');
     }
 
     return { failed };
@@ -217,6 +276,7 @@ export class MapService {
     try {
       const geocodingService = new AddressValidationService(address);
       const validatedAddress = await geocodingService.exec();
+
       if (!validatedAddress) {
         consola.warn('Address validation failed:', address);
         return { coords: null, error: 'Address validation failed' };
@@ -244,11 +304,19 @@ export class MapService {
     }
   }
 
-  static async saveHeatMap(addresses: Array<AddressFields>): Promise<string> {
+  static async saveHeatMap(
+    addresses: Array<
+      AddressFields & { geocode?: { latitude: number; longitude: number } }
+    >,
+  ): Promise<string> {
     const response = await fetch(`${API_URL}/saveHeatmapData`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ addresses }),
+      body: JSON.stringify({
+        addresses: addresses.filter(
+          (addr) => addr.geocode?.latitude && addr.geocode?.longitude,
+        ),
+      }),
     });
 
     const data = await response.json();
@@ -259,7 +327,7 @@ export class MapService {
     return data.data._id;
   }
 
-  static async loadHeatMap(heatmapID: string): Promise<Address[]> {
+  static async loadHeatMap(heatmapID: string): Promise<HeatmapData> {
     const response = await fetch(`${API_URL}/loadHeatmapData`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -267,11 +335,11 @@ export class MapService {
     });
 
     const data = await response.json();
-    if (!data.success) {
+    if (!data.data) {
       throw new Error(data.message || 'Failed to load heatmap');
     }
 
-    return data.data.addresses;
+    return data.data;
   }
 
   cleanup(): void {
