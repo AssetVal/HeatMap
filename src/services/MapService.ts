@@ -15,6 +15,7 @@ export class MapService {
   private L: typeof L | undefined; // Will hold Leaflet instance
   private markersGroup: MarkerClusterGroup | undefined;
   private countyLayer: GeoJSON | undefined;
+  private legend: L.Control | undefined;
   private mapStore: ReturnType<typeof useMapStore>;
 
   constructor(private container: HTMLElement) {
@@ -102,25 +103,27 @@ export class MapService {
   }
 
   private getColor(density: number): string {
-    return density > 500
-      ? '#800026'
-      : // Dark red
-        density > 200
-        ? '#BD0026'
-        : // Red
-          density > 100
-          ? '#E31A1C'
-          : // Bright red
-            density > 50
-            ? '#FC4E2A'
-            : // Orange-red
-              density > 20
-              ? '#FD8D3C'
-              : // Orange
-                density > 10
-                ? '#FEB24C'
-                : // Light orange
-                  '#FED976'; // Light yellow
+    // Convert to mi² if needed
+    const d = this.mapStore.state.useMiles ? density * 2.59 : density;
+
+    // Extended color scale with more granularity
+    return d > 1000 * (this.mapStore.state.useMiles ? 2.59 : 1)
+      ? '#67000D' // Darkest red
+      : d > 500 * (this.mapStore.state.useMiles ? 2.59 : 1)
+        ? '#800026'
+        : d > 200 * (this.mapStore.state.useMiles ? 2.59 : 1)
+          ? '#BD0026'
+          : d > 100 * (this.mapStore.state.useMiles ? 2.59 : 1)
+            ? '#E31A1C'
+            : d > 50 * (this.mapStore.state.useMiles ? 2.59 : 1)
+              ? '#FC4E2A'
+              : d > 20 * (this.mapStore.state.useMiles ? 2.59 : 1)
+                ? '#FD8D3C'
+                : d > 10 * (this.mapStore.state.useMiles ? 2.59 : 1)
+                  ? '#FEB24C'
+                  : d > 5 * (this.mapStore.state.useMiles ? 2.59 : 1)
+                    ? '#FED976'
+                    : '#FFEDA0'; // Lightest yellow
   }
 
   private renderCountyLayer(geojson: FeatureCollection): void {
@@ -133,23 +136,38 @@ export class MapService {
         fillOpacity: 0.7,
       }),
       onEachFeature: (feature: CountyFeature, layer: L.Layer) => {
+        const density = feature.properties.density;
+        const densityInCurrentUnit = this.mapStore.state.useMiles
+          ? density * 2.59
+          : density;
+
         layer.bindPopup(`
-          <div>
-            <strong>${feature.properties.NAME}</strong><br/>
-            Population: ${feature.properties.population.toLocaleString()}<br/>
-            Density: ${feature.properties.density.toFixed(2)} people/km²
-          </div>
-        `);
+        <div>
+          <strong>${feature.properties.NAME}</strong><br/>
+          Population: ${feature.properties.population.toLocaleString()}<br/>
+          Density: ${densityInCurrentUnit.toFixed(2)} people/${
+            this.mapStore.state.useMiles ? 'mi²' : 'km²'
+          }
+        </div>
+      `);
       },
     }).addTo(this.map!);
   }
-
   private addLegend(): void {
+    // Remove existing legend if it exists
+    if (this.legend) {
+      this.legend.remove();
+    }
+
     // @ts-ignore
-    const legend = this.L!.control({ position: 'bottomright' });
-    legend.onAdd = () => {
+    this.legend = this.L!.control({ position: 'bottomright' });
+    const unit = this.mapStore.state.useMiles ? 'mi²' : 'km²';
+
+    this.legend!.onAdd = () => {
       const div = this.L!.DomUtil.create('div', 'info legend');
-      const grades = [0, 10, 20, 50, 100, 200, 500];
+      const grades = [0, 10, 20, 50, 100, 200, 500].map((g) =>
+        this.mapStore.state.useMiles ? g * 2.59 : g,
+      );
 
       div.style.backgroundColor = 'white';
       div.style.padding = '6px 8px';
@@ -157,23 +175,23 @@ export class MapService {
       div.style.borderRadius = '4px';
 
       const labels = [
-        '<strong>Population Density</strong><br>(people/km²)<br>',
+        `<strong>Population Density</strong><br>(people/${unit})<br>`,
       ];
 
       for (let i = 0; i < grades.length; i++) {
         const from = grades[i];
         const to = grades[i + 1];
         labels.push(
-          `<i style="background:${this.getColor(from + 1)}; width: 18px; height: 18px; 
-            float: left; margin-right: 8px; opacity: 0.7"></i> 
-            ${from}${to ? `&ndash;${to}` : '+'}`,
+          `<i style="background:${this.getColor(from)}; width: 18px; height: 18px; 
+          float: left; margin-right: 8px; opacity: 0.7"></i>
+          ${Math.round(from)}${to ? `&ndash;${Math.round(to)}` : '+'}`,
         );
       }
 
       div.innerHTML = labels.join('<br>');
       return div;
     };
-    legend.addTo(this.map);
+    this.legend!.addTo(this.map!);
   }
 
   async addMarkers(

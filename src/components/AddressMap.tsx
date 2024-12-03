@@ -144,8 +144,21 @@ export function AddressMap(props: Props) {
         </div>
       </Show>
 
+      {/* Add unit toggle */}
+      <div class="absolute bottom-4 left-4 px-4 py-2 rounded">
+        <button
+          onClick={() => {
+            actions.toggleUnit();
+            mapService?.loadCountyData(); // Reload with new units
+          }}
+          class="flex items-center space-x-2 px-4 py-2 bg-sky-600 text-white rounded hover:bg-sky-700"
+        >
+          <span>Show in {state.useMiles ? 'km²' : 'mi²'}</span>
+        </button>
+      </div>
+
       <Show when={!state.isLoading && state.isSuccess && !props.isSharedMap}>
-        <div class="absolute top-4 right-4 bg-white px-4 py-2 rounded shadow z-[1000]">
+        <div class="absolute top-4 right-4 px-4 py-2 rounded">
           <button
             onClick={handleShare}
             class="flex items-center space-x-2 px-4 py-2 bg-sky-600 text-white rounded hover:bg-sky-700"

@@ -2,6 +2,7 @@ import { createStore } from 'solid-js/store';
 import type { Address, AddressFields } from '~/types';
 
 interface MapState {
+  useMiles: boolean;
   isLoading: boolean;
   progress: number;
   total: number;
@@ -20,6 +21,7 @@ interface MapState {
 }
 
 const [state, setState] = createStore<MapState>({
+  useMiles: true,
   isLoading: false,
   progress: 0,
   total: 0,
@@ -155,6 +157,10 @@ export function useMapStore() {
         geocodedAddresses: new Map(),
         processedAddresses: [],
       });
+    },
+
+    toggleUnit() {
+      setState('useMiles', (prev) => !prev);
     },
   };
 
