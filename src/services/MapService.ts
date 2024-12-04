@@ -43,7 +43,16 @@ export class MapService {
         console.debug('Leaflet loaded');
       }
 
-      consola.info('Creating map instance...');
+      // Fix marker icon paths for production
+      this.L.Icon.Default.imagePath = '/';
+      // @ts-ignore
+      delete this.L.Icon.Default.prototype._getIconUrl;
+      this.L.Icon.Default.mergeOptions({
+        iconRetinaUrl: '/marker-icon-2x.png',
+        iconUrl: '/marker-icon.png',
+        shadowUrl: '/marker-shadow.png',
+      });
+
       this.map = this.L.map(this.container, {
         center: [40, -95],
         zoom: 4,
