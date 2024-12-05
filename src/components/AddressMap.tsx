@@ -16,6 +16,7 @@ import consola from 'consola';
 import { useToast } from '~/hooks/useToast';
 import type { CountyFeature } from '~/types/map';
 import { SearchBox } from './SearchBox';
+import { centroid } from '@turf/turf';
 
 interface Props {
   addresses: Address[];
@@ -222,8 +223,8 @@ export function AddressMap(props: Props) {
         onHighlight={(feature) => {
           if (!mapService?.countyLayer) return;
 
-          // Reset previous highlight
           if (highlightedLayer) {
+            // Reset previous highlight
             (highlightedLayer as L.Path).setStyle({ weight: 1 });
           }
 
@@ -238,8 +239,20 @@ export function AddressMap(props: Props) {
             if (layer) {
               layer.setStyle({ weight: 3 });
               highlightedLayer = layer;
-              // Show popup for the selected feature
-              mapService.showPopupAtLocation(feature);
+              // Get the centroid of the feature for the popup
+              const center = centroid(feature.geometry);
+              const coords = [
+                center.geometry.coordinates[1],
+                center.geometry.coordinates[0],
+              ] as [number, number];
+              // Open popup at the feature's center
+              if ('bindPopup' in layer) {
+                (
+                  layer as L.Layer & {
+                    openPopup: (latlng?: L.LatLngExpression) => void;
+                  }
+                ).openPopup(coords);
+              }
             }
           }
         }}

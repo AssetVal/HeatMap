@@ -107,15 +107,14 @@ export const SearchBox: Component<Props> = (props) => {
 
       results.push(
         ...countyMatches.map((county) => {
-          // Calculate center point of the county geometry
           const center = centroid(county.geometry);
           return {
             type: 'county' as const,
-            text: `${county.properties.NAME}`,
+            text: `${county.properties.NAME} County, ${USStateConverter.convert(county.properties.STATE_NAME)}`,
             feature: county,
             coords: [
-              center.geometry.coordinates[1], // Latitude
-              center.geometry.coordinates[0], // Longitude
+              center.geometry.coordinates[1],
+              center.geometry.coordinates[0],
             ] as [number, number],
           };
         }),
@@ -240,7 +239,6 @@ export const SearchBox: Component<Props> = (props) => {
                     props.onSelect(result.coords, ZOOM_LEVELS[result.type]);
                     if (result.feature) {
                       props.onHighlight?.(result.feature);
-                      props.onShowPopup?.(result.coords);
                     }
                     setResults([]);
                     setQuery('');
