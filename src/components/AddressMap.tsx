@@ -223,35 +223,44 @@ export function AddressMap(props: Props) {
         onHighlight={(feature) => {
           if (!mapService?.countyLayer) return;
 
+          // Reset previous highlight
           if (highlightedLayer) {
-            // Reset previous highlight
             (highlightedLayer as L.Path).setStyle({ weight: 1 });
           }
 
           if (feature) {
             const layers = mapService.countyLayer.getLayers() as L.Layer[];
-            const layer = layers.find(
-              (l) =>
-                (l as any).feature?.properties?.NAME ===
-                feature.properties.NAME,
-            ) as L.Path;
+            const layer = layers.find((l) => {
+              const layerFeature = (l as any).feature;
+              return (
+                layerFeature?.properties?.NAME === feature.properties.NAME &&
+                layerFeature?.properties?.STATEFP === feature.properties.STATEFP
+              ); // Also match state to ensure uniqueness
+            }) as L.Path;
 
             if (layer) {
               layer.setStyle({ weight: 3 });
               highlightedLayer = layer;
-              // Get the centroid of the feature for the popup
-              const center = centroid(feature.geometry);
-              const coords = [
-                center.geometry.coordinates[1],
-                center.geometry.coordinates[0],
-              ] as [number, number];
-              // Open popup at the feature's center
-              if ('bindPopup' in layer) {
-                (
-                  layer as L.Layer & {
-                    openPopup: (latlng?: L.LatLngExpression) => void;
+              // Create popup content with the correct feature's data
+              const density = feature.properties.density;
+              const densityInCurrentUnit = mapService.mapStore.state.useMiles
+                ? density * 2.59
+                : density;
+
+              const popupContent = `
+                <div>
+                  <strong>${feature.properties.NAME}</strong><br/>
+                  Population: ${feature.properties.population.toLocaleString()}<br/>
+                  Density: ${densityInCurrentUnit.toFixed(2)} people/${
+                    mapService.mapStore.state.useMiles ? 'mi²' : 'km²'
                   }
-                ).openPopup(coords);
+                </div>
+              `;
+
+              if ('bindPopup' in layer) {
+                (layer as L.Layer & { bindPopup: (content: string) => L.Layer })
+                  .bindPopup(popupContent)
+                  .openPopup();
               }
             }
           }

@@ -16,7 +16,7 @@ export class MapService {
   private markersGroup: MarkerClusterGroup | undefined;
   public countyLayer: GeoJSON | undefined;
   private legend: L.Control | undefined;
-  private mapStore: ReturnType<typeof useMapStore>;
+  public mapStore: ReturnType<typeof useMapStore>;
 
   constructor(private container: HTMLElement) {
     this.mapStore = useMapStore();
