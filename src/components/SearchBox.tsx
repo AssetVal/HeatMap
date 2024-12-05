@@ -1,12 +1,13 @@
 import { USStateConverter } from '@assetval/state-switcher';
 import ZipMonster from '@simplisticated/zip-monster';
-import { Component, createSignal, For, Show } from 'solid-js';
-import { AddressValidationService } from '~/services/GeocodingService';
-import type { CountyFeature } from '~/types/map';
-import { useToast } from '~/hooks/useToast';
-import consola from 'consola';
 import { debounce } from '@solid-primitives/scheduled';
 import { centroid } from '@turf/turf';
+import consola from 'consola';
+import { Component, createSignal, Show } from 'solid-js';
+import { useToast } from '~/hooks/useToast';
+import { AddressValidationService } from '~/services/GeocodingService';
+import type { CountyFeature } from '~/types/map';
+import { VirtualList } from './VirtualList';
 
 const ZOOM_LEVELS = {
   county: 6,
@@ -19,6 +20,13 @@ interface Props {
   onSelect: (coords: [number, number], zoom: number) => void;
   onHighlight?: (feature?: CountyFeature) => void;
   onShowPopup?: (coords: [number, number]) => void;
+}
+
+interface SearchResults {
+  type: 'county' | 'zip' | 'address';
+  text: string;
+  feature?: CountyFeature;
+  coords: [number, number];
 }
 
 const parseAddress = (searchQuery: string) => {
@@ -74,14 +82,7 @@ const parseAddress = (searchQuery: string) => {
 export const SearchBox: Component<Props> = (props) => {
   const toast = useToast();
   const [query, setQuery] = createSignal('');
-  const [results, setResults] = createSignal<
-    Array<{
-      type: 'county' | 'zip' | 'address';
-      text: string;
-      feature?: CountyFeature;
-      coords: [number, number];
-    }>
-  >([]);
+  const [results, setResults] = createSignal<SearchResults[]>([]);
   const [isLoading, setIsLoading] = createSignal(false);
 
   const debouncedSearch = debounce(async (searchQuery: string) => {
@@ -230,28 +231,29 @@ export const SearchBox: Component<Props> = (props) => {
         </Show>
 
         <Show when={results().length > 0}>
-          <div class="absolute mt-1 w-full bg-white text-gray-900 rounded shadow-lg border border-gray-200 max-h-60 overflow-y-auto">
-            <For each={results()}>
-              {(result) => (
-                <button
-                  class="w-full px-4 py-2 text-left hover:bg-gray-100 flex items-center gap-2"
-                  onClick={() => {
-                    props.onSelect(result.coords, ZOOM_LEVELS[result.type]);
-                    if (result.feature) {
-                      props.onHighlight?.(result.feature);
-                    }
-                    setResults([]);
-                    setQuery('');
-                  }}
-                >
-                  <span class="flex-1">{result.text}</span>
-                  <span class="text-xs text-gray-500 capitalize">
-                    {result.type}
-                  </span>
-                </button>
-              )}
-            </For>
-          </div>
+          <VirtualList
+            items={results()}
+            itemHeight={40}
+            height="240px"
+            renderItem={(result) => (
+              <button
+                class="w-full h-full px-4 py-2 text-left hover:bg-gray-100 flex items-center gap-2"
+                onClick={() => {
+                  props.onSelect(result.coords, ZOOM_LEVELS[result.type]);
+                  if (result.feature) {
+                    props.onHighlight?.(result.feature);
+                  }
+                  setResults([]);
+                  setQuery('');
+                }}
+              >
+                <span class="flex-1 truncate">{result.text}</span>
+                <span class="text-xs text-gray-500 capitalize flex-shrink-0">
+                  {result.type}
+                </span>
+              </button>
+            )}
+          />
         </Show>
       </div>
     </div>
