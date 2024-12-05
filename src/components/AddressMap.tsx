@@ -14,6 +14,8 @@ import { SlidePanel } from './SlidePanel';
 import { useMapStore } from '~/stores/mapStore';
 import consola from 'consola';
 import { useToast } from '~/hooks/useToast';
+import type { CountyFeature } from '~/types/map';
+import { SearchBox } from './SearchBox';
 
 interface Props {
   addresses: Address[];
@@ -61,6 +63,9 @@ export function AddressMap(props: Props) {
   const [isPanelOpen, setIsPanelOpen] = createSignal(false);
   const [isMapReady, setIsMapReady] = createSignal(false);
   const [shareUrl, setShareUrl] = createSignal('');
+
+  const [counties, setCounties] = createSignal<CountyFeature[]>([]);
+  let highlightedLayer: L.Layer | null = null;
 
   let mapContainer: HTMLDivElement | undefined;
   let mapService: MapService;
@@ -113,6 +118,9 @@ export function AddressMap(props: Props) {
       mapService = new MapService(mapContainer);
       await mapService.initialize();
       await mapService.loadCountyData();
+
+      const { geojson } = await mapService.fetchCountyData();
+      setCounties(geojson.features as CountyFeature[]);
 
       setIsMapReady(true);
     } catch (error) {
@@ -204,6 +212,39 @@ export function AddressMap(props: Props) {
         </div>
       </Show>
 
+      {/* Search box */}
+      <SearchBox
+        counties={counties()}
+        onSelect={(coords, zoom) => {
+          if (!mapService?.map) return;
+          mapService.map.setView(coords, zoom);
+        }}
+        onHighlight={(feature) => {
+          if (!mapService?.countyLayer) return;
+
+          // Reset previous highlight
+          if (highlightedLayer) {
+            (highlightedLayer as L.Path).setStyle({ weight: 1 });
+          }
+
+          if (feature) {
+            const layers = mapService.countyLayer.getLayers() as L.Layer[];
+            const layer = layers.find(
+              (l) =>
+                (l as any).feature?.properties?.NAME ===
+                feature.properties.NAME,
+            ) as L.Path;
+
+            if (layer) {
+              layer.setStyle({ weight: 3 });
+              highlightedLayer = layer;
+              // Show popup for the selected feature
+              mapService.showPopupAtLocation(feature);
+            }
+          }
+        }}
+      />
+
       {/* Add unit toggle */}
       <div class="absolute bottom-4 left-4 px-4 py-2 rounded">
         <button
@@ -265,6 +306,7 @@ export function AddressMap(props: Props) {
         </div>
       </Show>
 
+      {/* Failed Geocode Sidebar */}
       <SlidePanel isOpen={isPanelOpen()} onClose={() => setIsPanelOpen(false)}>
         <h2 class="text-xl font-semibold mb-4">Failed Addresses</h2>
         <div class="space-y-4">

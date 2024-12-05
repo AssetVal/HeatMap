@@ -11,10 +11,10 @@ import { useMapStore } from '~/stores/mapStore';
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 export class MapService {
-  private map: L.Map | undefined;
+  public map: L.Map | undefined;
   private L: typeof L | undefined; // Will hold Leaflet instance
   private markersGroup: MarkerClusterGroup | undefined;
-  private countyLayer: GeoJSON | undefined;
+  public countyLayer: GeoJSON | undefined;
   private legend: L.Control | undefined;
   private mapStore: ReturnType<typeof useMapStore>;
 
@@ -105,10 +105,23 @@ export class MapService {
     this.addLegend();
   }
 
-  private async fetchCountyData(): Promise<{ geojson: FeatureCollection }> {
+  public async fetchCountyData(): Promise<{ geojson: FeatureCollection }> {
     const response = await fetch('/data/counties-with-population.geojson');
     const data = await response.json();
     return { geojson: data };
+  }
+
+  public showPopupAtLocation(feature: CountyFeature): void {
+    if (!this.map || !this.countyLayer) return;
+
+    // Find the layer for this feature
+    const layer = (this.countyLayer.getLayers() as L.Layer[]).find(
+      (l) => (l as any).feature?.properties?.NAME === feature.properties.NAME,
+    );
+
+    if (layer && 'openPopup' in layer) {
+      (layer as L.Layer & { openPopup: () => void }).openPopup();
+    }
   }
 
   private getColor(density: number): string {
