@@ -4,7 +4,8 @@
   "scripts": {
     "dev": "vinxi dev",
     "build": "vinxi build",
-    "start": "vinxi start"
+    "start": "vinxi start",
+    "test": "vitest"
   },
   "dependencies": {
     "@assetval/state-switcher": "^5.0.11",
@@ -22,7 +23,8 @@
     "leaflet.markercluster": "^1.5.3",
     "postcss": "^8.4.38",
     "solid-js": "^1.9.2",
-    "tailwindcss": "^3.4.3",
+    "solid-spinner": "^0.2.0",
+    "tailwindcss": "^3.4.16",
     "vinxi": "^0.4.3",
     "xlsx": "^0.18.5"
   },
@@ -31,11 +33,18 @@
   },
   "devDependencies": {
     "@biomejs/biome": "1.9.4",
+    "@solidjs/testing-library": "^0.8.10",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/user-event": "^14.5.2",
     "@types/geojson": "^7946.0.14",
-    "@types/leaflet": "^1.9.14",
+    "@types/leaflet": "^1.9.15",
     "@types/leaflet.heat": "^0.2.4",
     "@types/leaflet.markercluster": "^1.5.5",
-    "dotenv": "^16.4.5"
+    "@vitest/coverage-v8": "^2.1.8",
+    "dotenv": "^16.4.7",
+    "jsdom": "^25.0.1",
+    "vite-plugin-solid": "^2.11.0",
+    "vitest": "^2.1.8"
   },
   "packageManager": "pnpm@9.14.4+sha512.c8180b3fbe4e4bca02c94234717896b5529740a6cbadf19fa78254270403ea2f27d4e1d46a08a0f56c89b63dc8ebfd3ee53326da720273794e6200fcf0d184ab"
 }

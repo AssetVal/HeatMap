@@ -1,20 +1,25 @@
 {
-	"compilerOptions": {
-		"target": "ESNext",
-		"module": "ESNext",
-		"moduleResolution": "bundler",
-		"allowSyntheticDefaultImports": true,
-		"esModuleInterop": true,
-		"jsx": "preserve",
-		"jsxImportSource": "solid-js",
-		"allowJs": true,
-		"resolveJsonModule": true,
-		"noEmit": true,
-		"strict": true,
-		"types": ["vinxi/types/client", "leaflet", "leaflet.markercluster"],
-		"isolatedModules": true,
-		"paths": {
-			"~/*": ["./src/*"]
-		}
-	}
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "jsx": "preserve",
+    "jsxImportSource": "solid-js",
+    "allowJs": true,
+    "resolveJsonModule": true,
+    "noEmit": true,
+    "strict": true,
+    "types": [
+      "vinxi/types/client",
+      "leaflet",
+      "leaflet.markercluster",
+      "@testing-library/jest-dom"
+    ],
+    "isolatedModules": true,
+    "paths": {
+      "~/*": ["./src/*"]
+    }
+  }
 }
