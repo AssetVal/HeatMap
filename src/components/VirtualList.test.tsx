@@ -28,7 +28,9 @@ describe('VirtualList', () => {
       </Show>
     ));
 
-    const container = document.querySelector('.overflow-auto') as HTMLDivElement;
+    const container = document.querySelector(
+      '.overflow-auto',
+    ) as HTMLDivElement;
     expect(container).toBeTruthy();
     expect(container?.style.height).toBe('400px');
   });
@@ -119,7 +121,7 @@ describe('VirtualList', () => {
   });
 
   it('calls renderItem with correct parameters', () => {
-    const renderItem = vi.fn((item: string, index: number) => (
+    const renderItem = vi.fn((item: string) => (
       <div data-testid="list-item">{item}</div>
     ));
 
@@ -136,6 +138,7 @@ describe('VirtualList', () => {
 
     expect(renderItem).toHaveBeenCalled();
     expect(renderItem.mock.calls[0][0]).toBe('Item 0');
+    // @ts-expect-error second argument is a number
     expect(typeof renderItem.mock.calls[0][1]).toBe('number');
   });
 });

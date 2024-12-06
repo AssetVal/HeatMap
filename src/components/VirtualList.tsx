@@ -8,7 +8,7 @@ interface VirtualListProps<T> {
 }
 
 export function VirtualList<T>(props: VirtualListProps<T>) {
-  let containerRef: HTMLDivElement | undefined = undefined;
+  const [containerRef, setContainerRef] = createSignal<HTMLDivElement>();
   const [scrollTop, setScrollTop] = createSignal(0);
   const [visibleItems, setVisibleItems] = createSignal<{
     start: number;
@@ -16,10 +16,10 @@ export function VirtualList<T>(props: VirtualListProps<T>) {
   }>({ start: 0, end: 0 });
 
   createEffect(() => {
-    if (!containerRef) return;
+    if (!containerRef()) return;
 
     // Calculate visible range
-    const containerHeight = containerRef.clientHeight;
+    const containerHeight = containerRef()!.clientHeight;
     const totalItems = props.items.length;
     const start = Math.floor(scrollTop() / props.itemHeight);
     const end = Math.min(
@@ -37,7 +37,7 @@ export function VirtualList<T>(props: VirtualListProps<T>) {
 
   return (
     <div
-      ref={containerRef}
+      ref={setContainerRef}
       onScroll={handleScroll}
       class="overflow-auto relative"
       style={{ height: props.height }}
