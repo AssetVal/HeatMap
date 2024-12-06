@@ -4,9 +4,9 @@ import { debounce } from '@solid-primitives/scheduled';
 import { centroid } from '@turf/turf';
 import consola from 'consola';
 import { Component, createSignal, Show, onMount, onCleanup } from 'solid-js';
-import { useToast } from '~/hooks/useToast';
-import { AddressValidationService } from '~/services/GeocodingService';
-import type { CountyFeature } from '~/types/map';
+import { useToast } from '../hooks/useToast';
+import { AddressValidationService } from '../services/GeocodingService';
+import type { CountyFeature } from '../types/map';
 import { VirtualList } from './VirtualList';
 
 const ZOOM_LEVELS = {
