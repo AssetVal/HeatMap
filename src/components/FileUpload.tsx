@@ -33,10 +33,36 @@ export function FileUpload(props: Props) {
 
         // Try to find address-related fields
         const addressFields = {
-          street: row.street || row.Street || row.address || row.Address || row.propertyAddress || row["Property Street"] || row["Property Address"],
-          city: row.city || row.City || row.municipality || row.Municipality || row.propertyCity || row["Property City"],
-          state: row.state || row.State || row.province || row.Province || row.propertyState || row["Property State"],
-          zip: row.zip || row.Zip || row.ZIP || row.postal || row.PostalCode || row.propertyZip || row["Property Zip"]
+          street:
+            row.street ||
+            row.Street ||
+            row.address ||
+            row.Address ||
+            row.propertyAddress ||
+            row['Property Street'] ||
+            row['Property Address'],
+          city:
+            row.city ||
+            row.City ||
+            row.municipality ||
+            row.Municipality ||
+            row.propertyCity ||
+            row['Property City'],
+          state:
+            row.state ||
+            row.State ||
+            row.province ||
+            row.Province ||
+            row.propertyState ||
+            row['Property State'],
+          zip:
+            row.zip ||
+            row.Zip ||
+            row.ZIP ||
+            row.postal ||
+            row.PostalCode ||
+            row.propertyZip ||
+            row['Property Zip'],
         };
 
         // Log found fields
@@ -90,3 +116,4 @@ export function FileUpload(props: Props) {
     </div>
   );
 }
+export default FileUpload;

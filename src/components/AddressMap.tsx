@@ -350,3 +350,4 @@ export function AddressMap(props: Props) {
     </div>
   );
 }
+export default AddressMap;
