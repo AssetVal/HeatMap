@@ -8,7 +8,7 @@ interface VirtualListProps<T> {
 }
 
 export function VirtualList<T>(props: VirtualListProps<T>) {
-  let containerRef: HTMLDivElement | undefined;
+  let containerRef: HTMLDivElement | undefined = undefined;
   const [scrollTop, setScrollTop] = createSignal(0);
   const [visibleItems, setVisibleItems] = createSignal<{
     start: number;
