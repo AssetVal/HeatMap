@@ -115,7 +115,9 @@ describe('SearchBox', () => {
       </Show>
     ));
 
-    const input = screen.getByPlaceholderText('Search by county or ZIP...');
+    const input = screen.getByPlaceholderText(
+      'Search by county or ZIP...',
+    ) as HTMLInputElement;
     fireEvent.input(input, { target: { value: 'Test' } });
 
     const clearButton = screen.getByText('×');
