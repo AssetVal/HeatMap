@@ -356,13 +356,48 @@ export function AddressMap(props: Props) {
           <For each={state.failedAddresses}>
             {(addr) => (
               <div class="p-3 bg-red-50 rounded border border-red-200">
-                <p class="font-medium text-gray-900">{addr.fields.street}</p>
-                <p class="text-sm text-gray-600">
-                  {addr.fields.city}, {addr.fields.state} {addr.fields.zip}
-                </p>
-                <p class="text-xs text-red-600 mt-1">
-                  Error: {(addr as any).error || 'Failed to geocode'}
-                </p>
+                <div class="flex justify-between items-start">
+                  <div class="flex-1">
+                    <p class="font-medium text-gray-900">
+                      {addr.fields.street}
+                    </p>
+                    <p class="text-sm text-gray-600">
+                      {addr.fields.city}, {addr.fields.state} {addr.fields.zip}
+                    </p>
+                    <p class="text-xs text-red-600 mt-1">
+                      Error: {(addr as any).error || 'Failed to geocode'}
+                    </p>
+                  </div>
+                  <button
+                    onClick={async () => {
+                      const formattedAddress = `${addr.fields.street}, ${addr.fields.city}, ${addr.fields.state} ${addr.fields.zip}`;
+                      const copied = await copyToClipboard(formattedAddress);
+                      if (copied) {
+                        toast.success({
+                          message: 'Address copied to clipboard!',
+                          timeout: 2000,
+                        });
+                      } else {
+                        toast.error({
+                          message: 'Failed to copy address',
+                          timeout: 3000,
+                        });
+                      }
+                    }}
+                    class="ml-2 p-1.5 text-gray-500 hover:text-gray-700 hover:bg-red-100 rounded transition-colors"
+                    title="Copy address"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      class="h-4 w-4"
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                    >
+                      <path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" />
+                      <path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z" />
+                    </svg>
+                  </button>
+                </div>
               </div>
             )}
           </For>
