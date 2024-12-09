@@ -1,3 +1,4 @@
+import consola from 'consola';
 import 'leaflet.markercluster/dist/MarkerCluster.css';
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
 import {
@@ -8,15 +9,13 @@ import {
   onMount,
   Show,
 } from 'solid-js';
-import { MapService } from '~/services/MapService';
-import type { Address } from '~/types';
-import { SlidePanel } from './SlidePanel';
-import { useMapStore } from '~/stores/mapStore';
-import consola from 'consola';
 import { useToast } from '~/hooks/useToast';
+import { MapService } from '~/services/MapService';
+import { useMapStore } from '~/stores/mapStore';
+import type { Address } from '~/types';
 import type { CountyFeature } from '~/types/map';
 import { SearchBox } from './SearchBox';
-import { centroid } from '@turf/turf';
+import { SlidePanel } from './SlidePanel';
 
 interface Props {
   addresses: Address[];
