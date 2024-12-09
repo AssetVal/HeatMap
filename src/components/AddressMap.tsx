@@ -216,15 +216,6 @@ export function AddressMap(props: Props) {
               style={{ width: `${(state.progress / state.total) * 100}%` }}
             />
           </div>
-          <Show when={state.failed > 0}>
-            <button
-              type="button"
-              class="mt-2 text-sm text-red-500 hover:text-red-700"
-              onClick={() => setIsPanelOpen(true)}
-            >
-              Failed to geocode: {state.failed}
-            </button>
-          </Show>
         </div>
       </Show>
 
@@ -302,14 +293,16 @@ export function AddressMap(props: Props) {
       {/* Share map button */}
       <Show when={!state.isLoading && state.isSuccess && !props.isSharedMap}>
         <div class="absolute top-4 right-4 px-4 py-2 rounded bg-white shadow-md">
+          {/* Hide the shade button if we've already shared it */}
           <Show when={!state.shareId}>
             <button
               onClick={handleShare}
-              class="flex items-center space-x-2 px-4 py-2 bg-sky-600 text-white rounded hover:bg-sky-700 w-full"
+              class="flex items-center justify-center space-x-2 px-4 py-2 text-center bg-sky-600 text-white rounded hover:bg-sky-700 w-full"
             >
               <span>Share Map</span>
             </button>
           </Show>
+
           <Show when={state.shareId && !state.shareError}>
             <div class="mt-3 p-2 bg-gray-50 rounded border border-gray-200 flex items-center gap-2">
               <div class="flex-1 truncate text-sm font-mono text-gray-900">
@@ -342,6 +335,16 @@ export function AddressMap(props: Props) {
 
           <Show when={state.shareError}>
             <p class="text-sm text-red-600 mt-2">{state.shareError}</p>
+          </Show>
+
+          <Show when={state.failed > 0}>
+            <button
+              type="button"
+              class="mt-2 text-sm text-red-500 hover:text-red-700"
+              onClick={() => setIsPanelOpen(true)}
+            >
+              Failed to geocode: {state.failed}
+            </button>
           </Show>
         </div>
       </Show>
