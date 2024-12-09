@@ -72,9 +72,18 @@ export function AddressMap(props: Props) {
 
   const handleShare = async () => {
     try {
+      // Show the User that we are generating the link
+      toast.info({ message: 'Generating shareable link...', timeout: 2000 });
+
+      // Save the heatmap
       const id = await MapService.saveHeatMap(state.processedAddresses);
+      if (!id) {
+        throw new Error('Failed to save heatmap, please contact AssetVal I.T.');
+      }
+
       const url = `${window.location.origin}/map/${id}`;
       setShareUrl(url);
+      actions.setShareResult(id);
 
       const hasPermission = await checkClipboardPermission();
       if (!hasPermission) {
@@ -91,9 +100,15 @@ export function AddressMap(props: Props) {
       actions.setShareResult(id, copied ? '' : 'Failed to copy to clipboard');
 
       if (copied) {
-        toast.success({ message: 'Map link copied to clipboard!' });
+        toast.success({
+          message: 'Map link copied to clipboard!',
+          timeout: 3000,
+        });
       } else {
-        toast.error({ message: 'Failed to copy link to clipboard' });
+        toast.warning({
+          message: 'Link generated but copy failed. Click to copy manually.',
+          timeout: 5000,
+        });
       }
     } catch (error) {
       console.error('Error sharing map:', error);
@@ -188,6 +203,7 @@ export function AddressMap(props: Props) {
           }}
         />
       </Show>
+
       <Show when={state.isLoading}>
         <div class="absolute top-4 right-4 bg-white px-4 py-2 rounded shadow z-[1000]">
           <div class="mb-2 text-gray-900">
@@ -286,16 +302,19 @@ export function AddressMap(props: Props) {
       {/* Share map button */}
       <Show when={!state.isLoading && state.isSuccess && !props.isSharedMap}>
         <div class="absolute top-4 right-4 px-4 py-2 rounded bg-white shadow-md">
-          <button
-            onClick={handleShare}
-            class="flex items-center space-x-2 px-4 py-2 bg-sky-600 text-white rounded hover:bg-sky-700 w-full"
-          >
-            <span>Share Map</span>
-          </button>
-
+          <Show when={!state.shareId}>
+            <button
+              onClick={handleShare}
+              class="flex items-center space-x-2 px-4 py-2 bg-sky-600 text-white rounded hover:bg-sky-700 w-full"
+            >
+              <span>Share Map</span>
+            </button>
+          </Show>
           <Show when={state.shareId && !state.shareError}>
             <div class="mt-3 p-2 bg-gray-50 rounded border border-gray-200 flex items-center gap-2">
-              <div class="flex-1 truncate text-sm font-mono">{shareUrl()}</div>
+              <div class="flex-1 truncate text-sm font-mono text-gray-900">
+                {shareUrl()}
+              </div>
               <button
                 onClick={async () => {
                   const copied = await copyToClipboard(shareUrl());

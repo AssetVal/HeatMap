@@ -77,6 +77,13 @@ export function useToast() {
         timeout: 5000,
       }),
     info: (options: ToastOptions) => createToast('info', options),
+    warning: (options: ToastOptions) =>
+      createToast('info', {
+        ...options,
+        position: 'topRight',
+        timeout: 5000,
+        color: 'yellow',
+      }),
     dismissAll: () => {
       const toast = iziToast();
       if (!toast) return;

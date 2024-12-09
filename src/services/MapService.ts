@@ -349,22 +349,32 @@ export class MapService {
       AddressFields & { geocode?: { latitude: number; longitude: number } }
     >,
   ): Promise<string> {
-    const response = await fetch(`${API_URL}/saveHeatmapData`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        addresses: addresses.filter(
-          (addr) => addr.geocode?.latitude && addr.geocode?.longitude,
-        ),
-      }),
-    });
+    try {
+      const response = await fetch(`${API_URL}/saveHeatmapData`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          addresses: addresses.filter(
+            (addr) => addr.geocode?.latitude && addr.geocode?.longitude,
+          ),
+        }),
+      });
 
-    const data = await response.json();
-    if (!data.success) {
-      throw new Error(data.message || 'Failed to save heatmap');
+      if (!response.ok) {
+        throw new Error('Failed to save map data');
+      }
+
+      const data = await response.json();
+
+      if (!data?.data?._id) {
+        throw new Error(data.message || 'Failed to save heatmap');
+      }
+
+      return data.data._id;
+    } catch (error) {
+      consola.error('Failed to save heatmap:', error);
+      throw error;
     }
-
-    return data.data._id;
   }
 
   static async loadHeatMap(heatmapID: string): Promise<HeatmapData> {
