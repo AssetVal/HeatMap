@@ -172,4 +172,5 @@ export interface Address {
   fields: AddressFields;
   lat?: number;
   lng?: number;
+  countyDensity?: number;
 }

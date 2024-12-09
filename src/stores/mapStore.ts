@@ -16,7 +16,7 @@ interface MapState {
   addresses: Address[];
   geocodedAddresses: Map<string, { lat: number; lng: number }>;
   processedAddresses: Array<
-    AddressFields & { geocode?: { latitude: number; longitude: number } }
+    AddressFields & { geocode?: { latitude: number; longitude: number, countyDensity?: number } }
   >;
 }
 
@@ -55,13 +55,14 @@ export function useMapStore() {
               latitude: addr.lat!,
               longitude: addr.lng!,
             },
+            countyDensity: addr.countyDensity,
           })),
       );
       // Initialize geocodedAddresses map
       const geocoded = new Map();
       addresses.forEach((addr) => {
         if (addr.lat && addr.lng) {
-          geocoded.set(addressToKey(addr), { lat: addr.lat, lng: addr.lng });
+          geocoded.set(addressToKey(addr), { lat: addr.lat, lng: addr.lng, countyDensity: addr.countyDensity });
         }
       });
       setState('geocodedAddresses', geocoded);
@@ -87,7 +88,10 @@ export function useMapStore() {
       actions.updateETA(current);
     },
 
-    setGeocoded(address: Address, coords: { lat: number; lng: number }) {
+    setGeocoded(
+      address: Address,
+      coords: { lat: number; lng: number; countyDensity?: number },
+    ) {
       setState('geocodedAddresses', (map) => {
         const newMap = new Map(map);
         newMap.set(addressToKey(address), coords);
@@ -106,6 +110,7 @@ export function useMapStore() {
             latitude: coords.lat,
             longitude: coords.lng,
           },
+          countyDensity: coords.countyDensity,
         },
       ]);
     },

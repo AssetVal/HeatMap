@@ -16,6 +16,7 @@ import type { Address } from '~/types';
 import type { CountyFeature } from '~/types/map';
 import { SearchBox } from './SearchBox';
 import { SlidePanel } from './SlidePanel';
+import { StatsPanel } from './StatsPanel';
 
 interface Props {
   addresses: Address[];
@@ -289,6 +290,16 @@ export function AddressMap(props: Props) {
           <span>Show in {state.useMiles ? 'km²' : 'mi²'}</span>
         </button>
       </div>
+
+      <Show when={state.isSuccess && !state.isLoading}>
+        <StatsPanel
+          total={state.total}
+          successful={state.total - state.failed}
+          failed={state.failed}
+          addresses={state.processedAddresses}
+          useMiles={state.useMiles}
+        />
+      </Show>
 
       {/* Share map button */}
       <Show when={!state.isLoading && state.isSuccess && !props.isSharedMap}>

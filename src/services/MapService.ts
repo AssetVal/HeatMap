@@ -7,6 +7,7 @@ import type { Address, AddressFields } from '../types';
 import { AddressValidationService } from './GeocodingService';
 import consola from 'consola';
 import { useMapStore } from '~/stores/mapStore';
+import { point, booleanPointInPolygon } from '@turf/turf';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
@@ -239,11 +240,6 @@ export class MapService {
 
       // Check if address already has coordinates
       if (addr.lat && addr.lng) {
-        console.log(`Using existing coordinates for ${addr.fields.street}:`, {
-          lat: addr.lat,
-          lng: addr.lng,
-        });
-
         try {
           const marker = this.L!.marker([addr.lat, addr.lng]).bindPopup(`
           <div>
@@ -252,10 +248,36 @@ export class MapService {
           </div>
         `);
 
+          const spot = this.L!.latLng(addr.lat, addr.lng);
+          consola.info('Point:', spot);
+
+          const county = (this.countyLayer?.getLayers() as L.Layer[]).find(layer => {
+            try {
+              const feature = (layer as any).feature;
+              if (!feature) return false;
+
+              // Create turf point from coordinates
+              const pt = point([spot.lng, spot.lat]);
+              
+              // Use turf to check if point is in polygon
+              return booleanPointInPolygon(pt, feature.geometry);
+            } catch (err) {
+              console.error('Error checking point in polygon:', err);
+              return false;
+            }
+          });
+
+          const density = county
+            ? (county as any).feature?.properties?.density
+            : 0;
+          consola.info('Found county:', county ? (county as any).feature?.properties?.NAME : 'None', 
+        'with density:', density);
+
           this.markersGroup.addLayer(marker);
           this.mapStore.actions.setGeocoded(addr, {
             lat: addr.lat,
             lng: addr.lng,
+            countyDensity: density,
           });
           successCount++;
           continue;
@@ -277,9 +299,36 @@ export class MapService {
       const result = await this.geocode(geocodeAddress);
       if (result.coords) {
         console.log('Successfully geocoded address:', result.coords);
+        
+          const spot = this.L!.latLng(result.coords[0], result.coords[1]);
+          consola.info('Point:', spot);
+
+          const county = (this.countyLayer?.getLayers() as L.Layer[]).find(layer => {
+            try {
+              const feature = (layer as any).feature;
+              if (!feature) return false;
+
+              // Create turf point from coordinates
+              const pt = point([spot.lng, spot.lat]);
+              
+              // Use turf to check if point is in polygon
+              return booleanPointInPolygon(pt, feature.geometry);
+            } catch (err) {
+              console.error('Error checking point in polygon:', err);
+              return false;
+            }
+          });
+
+          const density = county
+            ? (county as any).feature?.properties?.density
+            : 0;
+          consola.info('County density:', density);
+        
+        
         this.mapStore.actions.setGeocoded(addr, {
           lat: result.coords[0],
           lng: result.coords[1],
+          countyDensity: density,
         });
 
         const marker = this.L!.marker(result.coords).bindPopup(`
