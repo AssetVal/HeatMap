@@ -1,4 +1,3 @@
-// src/components/StatsPanel.tsx
 import { Chart, Title, Tooltip, Legend, Colors, ArcElement } from 'chart.js';
 import consola from 'consola';
 import { Pie } from 'solid-chartjs';
@@ -110,15 +109,59 @@ export function StatsPanel(props: Props) {
     },
   };
 
+  const formatNumber = (num: number) => {
+    return num.toLocaleString('en-US');
+  };
+
+  const formatPercentage = (count: number) => {
+    return ((count / props.successful) * 100).toFixed(1);
+  };
+
   return (
-    <div class="absolute bottom-60 right-4 bg-white p-4 rounded shadow-md z-[1000]">
+    <div class="absolute bottom-10 left-4 bg-white p-4 rounded shadow-md z-[1000]">
       <div class="w-64 h-64">
         <Pie data={chartData()} options={chartOptions} />
       </div>
-      <div class="mt-2 text-center text-sm text-gray-600">
-        Successfully Geocoded: {props.successful}
+      
+      <div class="mt-4 mb-2">
+        <table class="w-full text-sm text-gray-800">
+          <thead>
+            <tr class="border-b">
+              <th class="text-left pb-2">Density Range</th>
+              <th class="text-right pb-2">Count</th>
+              <th class="text-right pb-2">%</th>
+            </tr>
+          </thead>
+          <tbody>
+            {chartData().labels.map((label, idx) => (
+              <tr class="hover:bg-gray-50">
+                <td class="py-1">
+                  <span class="inline-block w-3 h-3 mr-2" 
+                        style={{ "background-color": chartData().datasets[0].backgroundColor[idx] }}>
+                  </span>
+                  {label}
+                </td>
+                <td class="text-right">{formatNumber(chartData().datasets[0].data[idx])}</td>
+                <td class="text-right">
+                  {formatPercentage(chartData().datasets[0].data[idx])}%
+                </td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot class="border-t">
+            <tr>
+              <td class="pt-2 font-medium">Total</td>
+              <td class="pt-2 text-right font-medium">{formatNumber(props.successful)}</td>
+              <td class="pt-2 text-right font-medium">100%</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <div class="text-center text-sm text-gray-600">
+        Successfully Geocoded: {formatNumber(props.successful)}
         {props.failed > 0 && (
-          <span class="text-red-600 ml-2">({props.failed} failed)</span>
+          <span class="text-red-600 ml-2">({formatNumber(props.failed)} failed)</span>
         )}
       </div>
     </div>

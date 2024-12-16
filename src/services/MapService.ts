@@ -21,14 +21,12 @@ export class MapService {
 
   constructor(private container: HTMLElement) {
     this.mapStore = useMapStore();
-    console.log('MapService initialized with container:', container);
+    consola.info('MapService initialized with container:', container);
   }
 
   async initialize(): Promise<void> {
-    console.log('Initializing map service...');
-
     if (!this.container) {
-      console.error('Invalid container element');
+      consola.error('Invalid container element');
       return;
     }
 
@@ -38,10 +36,10 @@ export class MapService {
       this.L = leaflet.default;
 
       if (!this.L) {
-        console.error('Failed to load Leaflet');
+        consola.error('Failed to load Leaflet');
         return;
       } else {
-        console.debug('Leaflet loaded');
+        consola.debug('Leaflet loaded');
       }
 
       // Fix marker icon paths for production
@@ -70,13 +68,13 @@ export class MapService {
 
       // Force a resize to ensure proper rendering
       setTimeout(() => {
-        console.log('Invalidating map size...');
+        consola.info('Invalidating map size...');
         this.map?.invalidateSize();
       }, 250);
 
-      console.log('Map initialization complete');
+      consola.success('Map initialization complete');
     } catch (error) {
-      console.error('Error during map initialization:', error);
+      consola.error('Error during map initialization:', error);
       throw error;
     }
   }
@@ -101,15 +99,25 @@ export class MapService {
   }
 
   async loadCountyData(): Promise<void> {
-    const { geojson } = await this.fetchCountyData();
-    this.renderCountyLayer(geojson);
-    this.addLegend();
+    try {
+      const { geojson } = await this.fetchCountyData();
+      this.renderCountyLayer(geojson);
+      this.addLegend();
+    } catch (error) {
+      consola.error('Failed to load county data:', error);
+      throw error;
+    }
   }
 
   public async fetchCountyData(): Promise<{ geojson: FeatureCollection }> {
-    const response = await fetch('/data/counties-with-population.geojson');
-    const data = await response.json();
-    return { geojson: data };
+    try {
+      const response = await fetch('/data/counties-with-population.geojson');
+      const data = await response.json();
+      return { geojson: data };
+    } catch (error) {
+      consola.error('Failed to fetch county data:', error);
+      throw error;
+    }
   }
 
   public showPopupAtLocation(feature: CountyFeature): void {
@@ -177,7 +185,6 @@ export class MapService {
     }).addTo(this.map!);
   }
   private addLegend(): void {
-    // Remove existing legend if it exists
     if (this.legend) {
       this.legend.remove();
     }
@@ -192,10 +199,15 @@ export class MapService {
         this.mapStore.state.useMiles ? g * 2.59 : g,
       );
 
-      div.style.backgroundColor = 'white';
-      div.style.padding = '6px 8px';
-      div.style.border = '1px solid #ccc';
-      div.style.borderRadius = '4px';
+      div.style.cssText = `
+        background-color: white;
+        padding: 6px 8px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        margin-right: 12px;
+        margin-bottom: 2px;
+        z-index: 1000;
+      `
 
       const labels = [
         `<strong>Population Density</strong><br>(people/${unit})<br>`,
@@ -221,11 +233,11 @@ export class MapService {
     addresses: Address[],
     onProgress?: (current: number) => void,
   ): Promise<{ failed: Address[] }> {
-    console.log(`Adding ${addresses.length} markers to map`);
+    consola.log(`Adding ${addresses.length} markers to map`);
     const failed: Array<Address & { error: string }> = [];
 
     if (!this.markersGroup) {
-      console.error('No markers group available - reinitializing');
+      consola.error('No markers group available - reinitializing');
       this.initializeMarkerCluster();
       if (!this.markersGroup) {
         return { failed };
@@ -233,7 +245,6 @@ export class MapService {
     }
 
     this.markersGroup.clearLayers();
-    let successCount = 0;
 
     for (const [index, addr] of addresses.entries()) {
       onProgress?.(index + 1);
@@ -262,7 +273,7 @@ export class MapService {
               // Use turf to check if point is in polygon
               return booleanPointInPolygon(pt, feature.geometry);
             } catch (err) {
-              console.error('Error checking point in polygon:', err);
+              consola.error('Error checking point in polygon:', err);
               return false;
             }
           });
@@ -279,10 +290,9 @@ export class MapService {
             lng: addr.lng,
             countyDensity: density,
           });
-          successCount++;
           continue;
         } catch (error) {
-          console.error('Error adding marker:', error);
+          consola.error('Error adding marker:', error);
           failed.push({ ...addr, error: 'Failed to add marker' });
           continue;
         }
@@ -298,10 +308,7 @@ export class MapService {
 
       const result = await this.geocode(geocodeAddress);
       if (result.coords) {
-        console.log('Successfully geocoded address:', result.coords);
-        
           const spot = this.L!.latLng(result.coords[0], result.coords[1]);
-          consola.info('Point:', spot);
 
           const county = (this.countyLayer?.getLayers() as L.Layer[]).find(layer => {
             try {
@@ -314,7 +321,7 @@ export class MapService {
               // Use turf to check if point is in polygon
               return booleanPointInPolygon(pt, feature.geometry);
             } catch (err) {
-              console.error('Error checking point in polygon:', err);
+              consola.error('Error checking point in polygon:', err);
               return false;
             }
           });
@@ -322,9 +329,7 @@ export class MapService {
           const density = county
             ? (county as any).feature?.properties?.density
             : 0;
-          consola.info('County density:', density);
-        
-        
+
         this.mapStore.actions.setGeocoded(addr, {
           lat: result.coords[0],
           lng: result.coords[1],
@@ -344,13 +349,11 @@ export class MapService {
       }
     }
 
-    console.log(`Successfully added ${successCount} markers`);
-
     if (this.markersGroup.getLayers().length) {
-      console.log('Fitting bounds to markers');
+      consola.info('Fitting bounds to markers');
       this.map?.fitBounds(this.markersGroup.getBounds().pad(0.1));
     } else {
-      console.warn('No layers in marker group to fit bounds');
+      consola.warn('No layers in marker group to fit bounds');
     }
 
     return { failed };
