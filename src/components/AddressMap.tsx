@@ -275,7 +275,7 @@ export function AddressMap(props: Props) {
       />
 
       {/* Add unit toggle */}
-      <div class="absolute bottom-[22.5DVH] right-0 px-4 rounded">
+      <div class="absolute bottom-[23dvh] right-0 px-4 rounded">
         <button
           onClick={() => {
             actions.toggleUnit();
